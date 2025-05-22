@@ -6,6 +6,8 @@ COPY server.py .
 
 RUN pip install flask requests
 
+ENV PYTHONUNBUFFERED=1
+
 EXPOSE 8000
 
-CMD ["python", "server.py"]
+CMD ["python", "-u", "server.py"]

@@ -1,42 +1,47 @@
 import os
 import requests
-from flask import Flask, send_file, abort, Response
+from flask import Flask, send_file, abort
 
 app = Flask(__name__)
 BASE_DIR = "/data"
-REMOTE_BASE_URL = os.environ.get("REMOTE_BASE_URL", "https://download.jetbrains.com")
+REMOTE_BASE_URL = "https://download.jetbrains.com"  # Hardcoded remote URL
 
 os.makedirs(BASE_DIR, exist_ok=True)
+
+@app.route('/ping')
+def ping():
+    print("Ping received!")
+    return "pong"
 
 @app.route('/<path:filename>')
 def fetch_or_serve(filename):
     local_path = os.path.join(BASE_DIR, filename)
 
-    # If file is cached, serve with correct headers
     if os.path.isfile(local_path):
         return serve_with_size(local_path, filename)
 
-    # Create subdirs
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
     remote_url = f"{REMOTE_BASE_URL}/{filename}"
 
     try:
-        # HEAD for content length
+        print(f"Checking HEAD for {remote_url}")
         head = requests.head(remote_url, timeout=5)
         if head.status_code != 200 or 'Content-Length' not in head.headers:
+            print(f"HEAD request failed with status {head.status_code}")
             abort(404)
 
         total_size = int(head.headers['Content-Length'])
         print(f"Downloading {filename} ({total_size / (1024 * 1024):.2f} MB)")
 
-        # Download
         with requests.get(remote_url, stream=True, timeout=10) as r:
             if r.status_code != 200:
+                print(f"GET request failed with status {r.status_code}")
                 abort(404)
             with open(local_path, 'wb') as f:
                 for chunk in r.iter_content(8192):
                     f.write(chunk)
 
+        print(f"Downloaded and saved: {local_path}")
         return serve_with_size(local_path, filename)
 
     except Exception as e:
@@ -54,4 +59,4 @@ def serve_with_size(path, filename):
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8000)
