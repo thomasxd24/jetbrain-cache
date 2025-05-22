@@ -4,7 +4,7 @@ from flask import Flask, send_file, abort, Response
 
 app = Flask(__name__)
 BASE_DIR = "/data"
-REMOTE_BASE_URL = os.environ.get("REMOTE_BASE_URL", "https://here.com")
+REMOTE_BASE_URL = os.environ.get("REMOTE_BASE_URL", "https://download.jetbrains.com")
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
