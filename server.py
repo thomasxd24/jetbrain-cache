@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, send_file, abort
+from flask import Flask, Response, abort, stream_with_context
 
 app = Flask(__name__)
 BASE_DIR = "/data"
@@ -8,54 +8,69 @@ REMOTE_BASE_URL = os.environ.get("REMOTE_BASE_URL", "https://download-cdn.jetbra
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
-@app.route('/ping')
-def ping():
-    print("Ping received!")
-    return "pong"
-
 @app.route('/<path:filename>')
-def fetch_or_serve(filename):
+def fetch_or_stream(filename):
     local_path = os.path.join(BASE_DIR, filename)
 
+    # Serve cached file
     if os.path.isfile(local_path):
-        return serve_with_size(local_path, filename)
+        print(f"Serving cached: {filename}", flush=True)
+        return stream_local_file(local_path)
 
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
     remote_url = f"{REMOTE_BASE_URL}/{filename}"
 
     try:
-        print(f"Checking HEAD for {remote_url}")
+        print(f"Streaming and caching: {remote_url}", flush=True)
+
         head = requests.head(remote_url, timeout=5)
         if head.status_code != 200 or 'Content-Length' not in head.headers:
-            print(f"HEAD request failed with status {head.status_code}")
+            abort(404)
+        content_length = head.headers['Content-Length']
+
+        r = requests.get(remote_url, stream=True, timeout=10)
+        if r.status_code != 200:
             abort(404)
 
-        total_size = int(head.headers['Content-Length'])
-        print(f"Downloading {filename} ({total_size / (1024 * 1024):.2f} MB)")
-
-        with requests.get(remote_url, stream=True, timeout=10) as r:
-            if r.status_code != 200:
-                print(f"GET request failed with status {r.status_code}")
-                abort(404)
+        def generate():
             with open(local_path, 'wb') as f:
-                for chunk in r.iter_content(8192):
-                    f.write(chunk)
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        yield chunk
 
-        print(f"Downloaded and saved: {local_path}")
-        return serve_with_size(local_path, filename)
+        return Response(
+            stream_with_context(generate()),
+            headers={
+                "Content-Length": content_length,
+                "Content-Disposition": f"attachment; filename={os.path.basename(filename)}"
+            },
+            mimetype='application/octet-stream'
+        )
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}", flush=True)
         abort(500)
 
 
-def serve_with_size(path, filename):
+def stream_local_file(path):
+    def generate():
+        with open(path, 'rb') as f:
+            while True:
+                chunk = f.read(8192)
+                if not chunk:
+                    break
+                yield chunk
+
     size = os.path.getsize(path)
-    headers = {
-        "Content-Length": str(size),
-        "Content-Disposition": f"attachment; filename={os.path.basename(filename)}"
-    }
-    return send_file(path, as_attachment=True, download_name=os.path.basename(filename), headers=headers)
+    return Response(
+        stream_with_context(generate()),
+        headers={
+            "Content-Length": str(size),
+            "Content-Disposition": f"attachment; filename={os.path.basename(path)}"
+        },
+        mimetype='application/octet-stream'
+    )
 
 
 if __name__ == '__main__':
