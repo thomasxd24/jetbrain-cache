@@ -16,7 +16,7 @@
                 "type": "release",
                 "downloads": {
                     "linux": {
-                        "link": "https://vm24035:8000/idea/ideaIU-2024.1.6.tar.gz",
+                        "link": "https://vm24035:8000/cache/idea/ideaIU-2024.1.6.tar.gz",
                         "size": 1328404349
                     }
                 },

@@ -15,7 +15,7 @@ def get_products_json():
         abort(404)
     return send_file(local_file, mimetype='application/json')
 
-@app.route('/<path:filename>')
+@app.route('/cache/<path:filename>')
 def fetch_or_stream(filename):
     local_path = os.path.join(BASE_DIR, filename)
 
