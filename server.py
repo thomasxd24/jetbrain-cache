@@ -8,6 +8,13 @@ REMOTE_BASE_URL = os.environ.get("REMOTE_BASE_URL", "https://download-cdn.jetbra
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
+@app.route('/products.json')
+def get_products_json():
+    local_file = "./products.json"
+    if not os.path.isfile(local_file):
+        abort(404)
+    return send_file(local_file, mimetype='application/json')
+
 @app.route('/<path:filename>')
 def fetch_or_stream(filename):
     local_path = os.path.join(BASE_DIR, filename)
